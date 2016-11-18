@@ -19,7 +19,6 @@ void print_ab(const double *mat, const double *b, const uint32_t M, const uint32
 void print_x(const double *x, const uint32_t N);
 void replaceColMat(double *mat, const uint32_t i, const uint32_t j, const uint32_t M, const uint32_t N);
 void reorderX(double *x, const uint32_t *reoder, const uint32_t M);
-int32_t gauss(const double *a, const double *b, double *x, const uint32_t M, const uint32_t N);
 int32_t simplex_max(const Tableau_t *table, double *x);
 
 int32_t main() {
@@ -110,64 +109,6 @@ void reorderX(double *x, const uint32_t *reoder, const uint32_t M) {
 	return;
 }
 
-int32_t gauss(const double *a, const double *b, double *x, const uint32_t M, const uint32_t N) {
-	double *A = (double *)malloc(M * M * sizeof(double));
-	for (uint32_t i = 0; i < M; ++i) {
-		memcpy(A + i * M, a + (i + 1) * N - M, M * sizeof(double));
-	}
-	double *rhs = (double *)malloc(M * sizeof(double));
-	memcpy(rhs, b, M * sizeof(double));
-	uint32_t* col_index = (uint32_t *)malloc(M * sizeof(uint32_t));
-
-	for (uint32_t i = 0; i < M; ++i) {
-		col_index[i] = i;
-		double *A_i = A + i * M;
-		double max = fabs(*(A_i + i));
-		for (uint32_t k = i + 1; k < M; ++k) {
-			const double tmp = fabs(*(A_i + k));
-			if (tmp > max) {
-				max = tmp;
-				col_index[i] = k;
-			}
-		}
-
-		if (col_index[i] != i) {
-			replaceColMat(A, i, col_index[i], M, M);
-		}
-
-		for (uint32_t k = i + 1; k < M; ++k) {
-			double *A_k = A + k * M;
-			if (*(A_k + i) == 0.0) continue;
-			const double factor = *(A_k + i) / *(A_i + i);
-			*(A_k + i) = 0.0;
-			for (uint32_t j = i + 1; j < M; ++j) {
-				*(A_k + j) -= *(A_i + j) * factor;
-			}
-			*(rhs + k) -= *(rhs + i) * factor;
-		}
-	}
-
-	for (int32_t i = M - 1; i > 0; --i) {
-		double *rhs_i = rhs + i;
-		double *A_i = A + i * (M + 1);
-		const double x_i = *(rhs_i) / *(A + i * M + i);
-		*(x + i) = x_i;
-		int32_t k = 1;
-		while (i - k >= 0) {
-			*(rhs_i - k) -= *(A_i - k * M) * x_i;
-			k++;
-		}
-	}
-	*(x) = *(rhs) / *(A);
-
-	reorderX(x, col_index, M);
-
-	free(A);
-	free(rhs);
-	free(col_index);
-	return 0;
-}
-
 int32_t simplex_max(const Tableau_t *table, double *x) {
 	const double T = -1.0e+10;
 	const uint32_t N = table->N;
@@ -185,14 +126,19 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	memcpy(c, table->c, M * sizeof(double));
 	for (uint32_t i = 0; i < M; ++i) {
 		memcpy(a + i * K, table->a + i * N, N * sizeof(double));
-		a[i * K + i + M] = 1.0;
+		a[i * K + i + N] = 1.0;
 		col_index[i] = i;
 	}
 	for (uint32_t i = M; i < K; ++i) {
-		c[i] = T;
+		if (i >= N) {
+			c[i] = T;
+		}
 		col_index[i] = i;
 	}
-	gauss(a, b, x_ + (K - M), M, K);
+
+	for (uint32_t i = K - M; i < K; ++i) {
+		x_[i] = b[i - M];
+	}
 
 	uint32_t z;
 	const uint32_t max_iter = 20;

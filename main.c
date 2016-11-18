@@ -15,7 +15,6 @@ typedef struct Tableau {
 } Tableau_t;
 
 inline double f(const double *c, const double *x, const uint32_t N);
-int32_t triangle(double *mat, double *b, const uint32_t N, const uint32_t M);
 void print_ab(const double *mat, const double *b, const uint32_t M, const uint32_t N);
 void print_x(const double *x, const uint32_t N);
 void replaceColMat(double *mat, const uint32_t i, const uint32_t j, const uint32_t M, const uint32_t N);
@@ -28,7 +27,6 @@ int32_t main() {
 	const uint32_t dim = 4;
 	table.M = dim;
 	table.N = dim;
-	//a.a = (double *)malloc(a.N * a.M * sizeof(double));
 	double mat[4 * 4] = { 1.01, 1.01, 9.45, 0.95,
 	                      0.25, 1.0 / 6.0, 0, 0,
 	                      0.0, 0.0, 1.0 / 30.0, 4.0,
@@ -63,31 +61,6 @@ inline double f(const double *c, const double *x, const uint32_t N) {
 		res += c[i] * x[i];
 	}
 	return res;
-}
-
-int32_t triangle(double *mat, double *b, const uint32_t N, const uint32_t M) {
-	for (uint32_t i = 0; i < M; ++i) {
-		double *denumerator = mat + i * N + i;
-		for (uint32_t k = 0; k < M; ++k) {
-			if (k == i) {
-				const double tmp = 1.0 / *denumerator;
-				for (uint32_t j = i; j < N; ++j) {
-					mat[i * N + j] *= tmp;
-				}
-				b[i] *= tmp;
-			}
-			else {
-				const double tmp = mat[k * N + i] / *denumerator;
-				for (uint32_t j = i; j < N; ++j) {
-					mat[k * N + j] -= tmp * mat[i * N + j];
-				}
-				b[k] -= tmp * b[i];
-			}
-
-		}
-	}
-
-	return 0;
 }
 
 void print_ab(const double *mat, const double *b, const uint32_t M, const uint32_t N) {
@@ -164,9 +137,7 @@ int32_t gauss(const double *a, const double *b, double *x, const uint32_t M, con
 
 		for (uint32_t k = i + 1; k < M; ++k) {
 			double *A_k = A + k * M;
-			if (*(A_k + i) == 0.0)
-				continue;
-
+			if (*(A_k + i) == 0.0) continue;
 			const double factor = *(A_k + i) / *(A_i + i);
 			*(A_k + i) = 0.0;
 			for (uint32_t j = i + 1; j < M; ++j) {
@@ -223,8 +194,9 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	}
 	gauss(a, b, x_ + (K - M), M, K);
 
+	uint32_t z;
 	const uint32_t max_iter = 20;
-	for (uint32_t z = 0; z < max_iter; ++z) {
+	for (z = 0; z < max_iter; ++z) {
 		bool isPositiveDelta = false;
 
 		for (uint32_t i = 0; i < M; ++i) {
@@ -274,19 +246,23 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 
 		for (uint32_t i = 0; i < M; ++i) {
 			if (i == row_s) continue;
-			const double tmp2 = a[i * K + col_r] / a[row_s * K + col_r];
+			const double factor = a[i * K + col_r] / a[row_s * K + col_r];
 			for (uint32_t j = 0; j < K; ++j) {
-				a[i * K + j] -= a[row_s * K + j] * tmp2;
+				a[i * K + j] -= a[row_s * K + j] * factor;
 			}
-			x_[i + M] -= x_[col_s] * tmp2;
+			x_[i + M] -= x_[col_s] * factor;
 		}
 
 		replaceColMat(a, col_r, col_s, M, K);
 		replaceColMat(c, col_r, col_s, 1, K);
-		const double tmp3 = col_index[col_r];
+		const uint32_t tmp2 = col_index[col_r];
 		col_index[col_r] = col_index[col_s];
-		col_index[col_s] = tmp3;
+		col_index[col_s] = tmp2;
 	}
+	if (z == max_iter) {
+		printf("Warning: MAX ITER!\n");
+	}
+	printf("ITER = %" PRId32 "\n\n", z);
 
 	reorderX(x_, col_index, K);
 	memcpy(x, x_, M * sizeof(double));

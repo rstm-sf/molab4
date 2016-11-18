@@ -51,6 +51,7 @@ int32_t main() {
 
 	system("pause");
 
+	free(x);
 	return 0;
 }
 

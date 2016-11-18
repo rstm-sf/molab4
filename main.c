@@ -252,49 +252,40 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 			}
 		}
 
-		if (max_delta != 0.0) {
-			uint32_t col_s = 0;
-			uint32_t row_s = 0;
-			const double max = 1.0e+10;
-			double min_delta = max;
-			for (uint32_t i = 0; i < M; ++i) {
-				if (a[i * K + col_r] <= 0) continue;
-				const double tmp = x_[i + M] / a[i * K + col_r];
-				if (tmp <= min_delta) {
-					min_delta = tmp;
-					row_s = i;
-					col_s = i + M;
-				}
+		uint32_t col_s = 0;
+		uint32_t row_s = 0;
+		const double max = 1.0e+10;
+		double min_delta = max;
+		for (uint32_t i = 0; i < M; ++i) {
+			if (a[i * K + col_r] <= 0) continue;
+			const double tmp = x_[i + M] / a[i * K + col_r];
+			if (tmp <= min_delta) {
+				min_delta = tmp;
+				row_s = i;
+				col_s = i + M;
 			}
-
-			if (min_delta != max) {
-				const double tmp = 1.0 / a[row_s * K + col_r];
-				x_[col_s] *= tmp;
-				for (uint32_t i = 0; i < K; ++i) {
-					a[row_s * K + i] *= tmp;
-				}
-
-				for (uint32_t i = 0; i < M; ++i) {
-					if (i == row_s) continue;
-					const double tmp2 = a[i * K + col_r] / a[row_s * K + col_r];
-					for (uint32_t j = 0; j < K; ++j) {
-						a[i * K + j] -= a[row_s * K + j] * tmp2;
-					}
-					x_[i + M] -= x_[col_s] * tmp2;
-				}
-
-				replaceColMat(a, col_r, col_s, M, K);
-				replaceColMat(c, col_r, col_s, 1, K);
-				const double temp = col_index[col_r];
-				col_index[col_r] = col_index[col_s];
-				col_index[col_s] = temp;
-			} else {
-				break;
-			}
-		} else {
-			printf("No Positive!\n");
-			break;
 		}
+
+		const double tmp = 1.0 / a[row_s * K + col_r];
+		x_[col_s] *= tmp;
+		for (uint32_t i = 0; i < K; ++i) {
+			a[row_s * K + i] *= tmp;
+		}
+
+		for (uint32_t i = 0; i < M; ++i) {
+			if (i == row_s) continue;
+			const double tmp2 = a[i * K + col_r] / a[row_s * K + col_r];
+			for (uint32_t j = 0; j < K; ++j) {
+				a[i * K + j] -= a[row_s * K + j] * tmp2;
+			}
+			x_[i + M] -= x_[col_s] * tmp2;
+		}
+
+		replaceColMat(a, col_r, col_s, M, K);
+		replaceColMat(c, col_r, col_s, 1, K);
+		const double tmp3 = col_index[col_r];
+		col_index[col_r] = col_index[col_s];
+		col_index[col_s] = tmp3;
 	}
 
 	reorderX(x_, col_index, K);

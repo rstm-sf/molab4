@@ -10,7 +10,6 @@
 typedef struct Tableau {
 	uint32_t M;
 	uint32_t N;
-	int8_t *sign;
 	double *a;
 	double *b;
 	double *c;
@@ -28,17 +27,15 @@ int32_t main() {
 	const uint32_t dim = 4;
 	table.M = dim;
 	table.N = dim;
-	double mat[4 * 4] = { 1.01, 1.01, 9.45, 0.95,
-	                      0.25, 1.0 / 6.0, 0, 0,
-	                      0.0, 0.0, 1.0 / 30.0, 4.0,
-	                      0.0, 0.0, 0.0, 1.0 };
+	double mat[4 * 4] = { 1.01, 1.01,      9.45,       0.95,
+	                      0.25, 1.0 / 6.0, 0.0,        0.0,
+	                      0.0,  0.0,       1.0 / 30.0, 4.0,
+	                      0.0,  0.0,       0.0,        1.0 };
 	double b[4] = { 140.0, 21.0, 16.0, 15.0 };
 	double c[4] = { 2.4, 2.7, 13.8, 2.75 };
-	int8_t sign[4] = { 1, 1, 1, 1 };
 	table.a = mat;
 	table.b = b;
 	table.c = c;
-	table.sign = sign;
 
 	printf("F(x) = ");
 	for (uint32_t i = 0; i < table.M; ++i) {
@@ -125,28 +122,19 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	double *delta = (double *)calloc(M, sizeof(double));
 	double *x_ = (double *)calloc(K, sizeof(double));
 	uint32_t *col_index = (uint32_t *)malloc(K * sizeof(uint32_t));
-	const int8_t *sign = table->sign;
 
 	memcpy(x_, x, M * sizeof(double));
 	memcpy(b, table->b, M * sizeof(double));
 	memcpy(c, table->c, M * sizeof(double));
 	for (uint32_t i = 0; i < M; ++i) {
 		memcpy(a + i * K, table->a + i * N, N * sizeof(double));
-		if (sign[i] == 1) {
-			a[i * K + i + N] = 1.0;
-		} else if (sign[i] == 2) {
-			a[i * K + i + N] = -1.0;
-		}
+		a[i * K + i + N] = 1.0;
 
 		col_index[i] = i;
 	}
 	for (uint32_t i = M; i < K; ++i) {
 		if (i >= N) {
-			if (sign[i - N] == 1) {
-				c[i] = -T;
-			} else if (sign[i - N] == 2) {
-				c[i] = T;
-			}
+			c[i] = -T;
 		}
 		col_index[i] = i;
 	}
@@ -155,9 +143,9 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 		x_[i] = b[i - N] / a[(i - N) * K + i];
 	}
 
-	uint32_t z;
+	uint32_t iter;
 	const uint32_t max_iter = 20;
-	for (z = 0; z < max_iter; ++z) {
+	for (iter = 0; iter < max_iter; ++iter) {
 		bool isPositiveDelta = false;
 
 		for (uint32_t i = 0; i < M; ++i) {
@@ -219,10 +207,10 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 		col_index[col_r] = col_index[col_s];
 		col_index[col_s] = tmp2;
 	}
-	if (z == max_iter) {
+	if (iter == max_iter) {
 		printf("Warning: MAX ITER!\n");
 	}
-	printf("ITER = %" PRId32 "\n\n", z);
+	printf("ITER = %" PRId32 "\n\n", iter);
 
 	reorderX(x_, col_index, K);
 	memcpy(x, x_, M * sizeof(double));

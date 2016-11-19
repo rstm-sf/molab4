@@ -5,10 +5,12 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <float.h>
 
 typedef struct Tableau {
 	uint32_t M;
 	uint32_t N;
+	int8_t *sign;
 	double *a;
 	double *b;
 	double *c;
@@ -32,9 +34,11 @@ int32_t main() {
 	                      0.0, 0.0, 0.0, 1.0 };
 	double b[4] = { 140.0, 21.0, 16.0, 15.0 };
 	double c[4] = { 2.4, 2.7, 13.8, 2.75 };
+	int8_t sign[4] = { 1, 1, 1, 1 };
 	table.a = mat;
 	table.b = b;
 	table.c = c;
+	table.sign = sign;
 
 	printf("F(x) = ");
 	for (uint32_t i = 0; i < table.M; ++i) {
@@ -111,7 +115,7 @@ void reorderX(double *x, const uint32_t *reoder, const uint32_t M) {
 }
 
 int32_t simplex_max(const Tableau_t *table, double *x) {
-	const double T = -1.0e+10;
+	const double T = 1.0e+10;
 	const uint32_t N = table->N;
 	const uint32_t M = table->M;
 	const uint32_t K = M + N;
@@ -121,24 +125,34 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	double *delta = (double *)calloc(M, sizeof(double));
 	double *x_ = (double *)calloc(K, sizeof(double));
 	uint32_t *col_index = (uint32_t *)malloc(K * sizeof(uint32_t));
+	const int8_t *sign = table->sign;
 
 	memcpy(x_, x, M * sizeof(double));
 	memcpy(b, table->b, M * sizeof(double));
 	memcpy(c, table->c, M * sizeof(double));
 	for (uint32_t i = 0; i < M; ++i) {
 		memcpy(a + i * K, table->a + i * N, N * sizeof(double));
-		a[i * K + i + N] = 1.0;
+		if (sign[i] == 1) {
+			a[i * K + i + N] = 1.0;
+		} else if (sign[i] == 2) {
+			a[i * K + i + N] = -1.0;
+		}
+
 		col_index[i] = i;
 	}
 	for (uint32_t i = M; i < K; ++i) {
 		if (i >= N) {
-			c[i] = T;
+			if (sign[i - N] == 1) {
+				c[i] = -T;
+			} else if (sign[i - N] == 2) {
+				c[i] = T;
+			}
 		}
 		col_index[i] = i;
 	}
 
 	for (uint32_t i = K - M; i < K; ++i) {
-		x_[i] = b[i - M];
+		x_[i] = b[i - N] / a[(i - N) * K + i];
 	}
 
 	uint32_t z;
@@ -173,8 +187,7 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 
 		uint32_t col_s = 0;
 		uint32_t row_s = 0;
-		const double max = 1.0e+10;
-		double min_delta = max;
+		double min_delta = DBL_MAX;
 		for (uint32_t i = 0; i < M; ++i) {
 			if (a[i * K + col_r] <= 0) continue;
 			const double tmp = x_[i + M] / a[i * K + col_r];

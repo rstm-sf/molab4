@@ -13,8 +13,11 @@ typedef struct Tableau {
 	double *a;
 	double *b;
 	double *c;
+	void (*print)(const struct Tableau *);
 } Tableau_t;
 
+
+inline void print_task(const Tableau_t *table);
 inline double f(const double *c, const double *x, const uint32_t N);
 void print_ab(const double *mat, const double *b, const uint32_t M, const uint32_t N);
 void print_x(const double *x, const uint32_t N);
@@ -34,13 +37,8 @@ int32_t main() {
 	table.a = mat;
 	table.b = b;
 	table.c = c;
-
-	printf("F(x) = ");
-	for (uint32_t i = 0; i < table.M; ++i) {
-		printf("+ (%.2f) * x[%" PRIu32 "] ", table.c[i], i);
-	}
-	printf("\n");
-	print_ab(table.a, table.b, table.M, table.N);
+	table.print = print_task;
+	table.print(&table);
 
 	double *x = (double *)calloc(table.M, sizeof(double));
 	simplex_max(&table, x);
@@ -52,6 +50,19 @@ int32_t main() {
 
 	free(x);
 	return 0;
+}
+
+inline void print_task(const Tableau_t *table) {
+	printf("F(x) = ");
+	const uint32_t M = table->M;
+	const double *c = table->c;
+	for (uint32_t i = 0; i < M; ++i) {
+		printf("+ (%.2f) * x[%" PRIu32 "] ", c[i], i);
+	}
+	printf("\n");
+	print_ab(table->a, table->b, table->M, table->N);
+
+	return;
 }
 
 inline double f(const double *c, const double *x, const uint32_t N) {
@@ -88,6 +99,7 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	const uint32_t N = table->N;
 	const uint32_t M = table->M;
 	const uint32_t K = M + N;
+	const uint32_t offset_b = K - M;
 	const double *b = table->b;
 
 	double *a = (double *)calloc(M * K, sizeof(double));
@@ -113,21 +125,20 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 		col_index[i] = i;
 	}
 
-	for (uint32_t i = K - M; i < K; ++i) {
-		x_[i] = b[i - K + M];
+	for (uint32_t i = offset_b; i < K; ++i) {
+		x_[i] = b[i - offset_b];
 	}
 
 	uint32_t iter;
 	const uint32_t max_iter = 20;
 	for (iter = 0; iter < max_iter; ++iter) {
 		bool isPositiveDelta = false;
-		//print_ab(a, x_ + M, M, K);
 
 		for (uint32_t i = 0; i < M; ++i) {
 			double z = 0.0;
 			const uint32_t ii = col_index[i];
 			for (uint32_t k = 0; k < M; ++k) {
-				const uint32_t kk = col_index[k + K - M];
+				const uint32_t kk = col_index[k + offset_b];
 				z += c[kk] * a[k * K + ii];
 			}
 			delta[i] = c[ii] - z;
@@ -155,18 +166,17 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 		for (uint32_t i = 0; i < M; ++i) {
 			const double a_ir = a[i * K + col_r];
 			if (a_ir <= 0) continue;
-			const double tmp = x_[col_index[i + K - M]] / a_ir;
+			const double tmp = x_[col_index[i + offset_b]] / a_ir;
 			if (tmp <= min_delta) {
 				min_delta = tmp;
 				row_s = i;
 			}
 		}
-		const uint32_t col_s = col_index[row_s + M];
+		const uint32_t col_s = col_index[row_s + offset_b];
 		double *a_s = a + row_s * K;
 
 		const double tmp = 1.0 / *(a + row_s * K + col_r);
 		x_[col_r] = x_[col_s] * tmp;
-		x_[col_s] = 0.0;
 		const double x_r = x_[col_r];
 		for (uint32_t i = 0; i < K; ++i) {
 			*(a_s + i) *= tmp;
@@ -176,14 +186,15 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 			if (i == row_s) continue;
 			double *a_i = a + i * K;
 			const double factor = *(a_i + col_r); // a[s,r] = 1
-			x_[col_index[i + M]] -= factor * x_r;
+			x_[col_index[i + offset_b]] -= factor * x_r;
 			for (uint32_t j = 0; j < K; ++j) {
 				*(a_i + j) -= *(a_s + j) * factor;
 			}
 		}
 
-		col_index[row_s + M] = col_r;
+		col_index[row_s + offset_b] = col_r;
 		col_index[index_r] = col_s;
+		x_[col_s] = 0.0;
 	}
 	if (iter == max_iter) {
 		printf("Warning: MAX ITER!\n");

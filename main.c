@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
+#include <assert.h>
 
 typedef struct Tableau {
 	uint32_t M;
@@ -13,9 +14,8 @@ typedef struct Tableau {
 	double *a;
 	double *b;
 	double *c;
-	void (*print)(const struct Tableau *);
+	void(*print)(const struct Tableau *);
 } Tableau_t;
-
 
 inline void print_task(const Tableau_t *table);
 inline double f(const double *c, const double *x, const uint32_t N);
@@ -30,7 +30,14 @@ int32_t main() {
 	                      0.0,  0.0,       0.0,        1.0 };
 	double b[4] = { 140.0, 21.0, 16.0, 15.0 };
 	double c[4] = { 2.4, 2.7, 13.8, 2.75 };
-
+	/*
+	double mat[4 * 4] = { 1.01, 0.25,      0.0,        0.0,
+	                      1.01, 1.0 / 6.0, 0.0,        0.0,
+	                      9.45, 0.0,       1.0 / 30.0, 0.0,
+	                      0.95, 0.0,       4.0,        1.0 };
+	double b[4] = { 2.4, 2.7, 13.8, 2.75 };
+	double c[4] = { 140.0, 21.0, 16.0, 15.0 };
+	*/
 	Tableau_t table;
 	table.M = 4;
 	table.N = 4;
@@ -98,102 +105,103 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	const double T = 1.0e+10;
 	const uint32_t N = table->N;
 	const uint32_t M = table->M;
-	const uint32_t K = M + N;
-	const uint32_t offset_b = K - M;
+	const uint32_t N_ext = M + N;
+	const uint32_t offset_b = N_ext - M;
 	const double *b = table->b;
 
-	double *a = (double *)calloc(M * K, sizeof(double));
-	double *c = (double *)malloc(K * sizeof(double));
-	double *x_ = (double *)calloc(K, sizeof(double));
-	double *delta = (double *)calloc(K - M, sizeof(double));
+	for (uint32_t i = 0; i < M; ++i) {
+		assert(b[i] >= 0);
+	}
+
+	double *a = (double *)calloc(M * N_ext, sizeof(double));
+	double *c = (double *)malloc(N_ext * sizeof(double));
+	double *x_ = (double *)calloc(N_ext, sizeof(double));
 	// col_index - the room basic and not basic columns
-	// col_index[0 .. K - M] - not basic; col_index[K - M .. K - 1] - basic
-	uint32_t *col_index = (uint32_t *)malloc(K * sizeof(uint32_t));
+	// col_index[0 .. N_ext - M - 1] - not basic; col_index[N_ext - M .. N_ext - 1] - basic
+	uint32_t *col_index = (uint32_t *)malloc(N_ext * sizeof(uint32_t));
+	uint32_t *col_index_nb = col_index;
+	uint32_t *col_index_b  = col_index + offset_b;
 
 	memcpy(x_, x, M * sizeof(double));
 	memcpy(c, table->c, M * sizeof(double));
 	for (uint32_t i = 0; i < M; ++i) {
-		memcpy(a + i * K, table->a + i * N, N * sizeof(double));
-		a[i * K + i + N] = 1.0;
+		memcpy(a + i * N_ext, table->a + i * N, N * sizeof(double));
+		a[i * N_ext + i + N] = 1.0;
 
 		col_index[i] = i;
 	}
-	for (uint32_t i = M; i < K; ++i) {
+	for (uint32_t i = M; i < N_ext; ++i) {
 		if (i >= N) {
 			c[i] = -T;
 		}
 		col_index[i] = i;
 	}
 
-	for (uint32_t i = offset_b; i < K; ++i) {
+	for (uint32_t i = offset_b; i < N_ext; ++i) {
 		x_[i] = b[i - offset_b];
 	}
 
 	uint32_t iter;
 	const uint32_t max_iter = 20;
 	for (iter = 0; iter < max_iter; ++iter) {
-		bool isPositiveDelta = false;
-
-		for (uint32_t i = 0; i < M; ++i) {
-			double z = 0.0;
-			const uint32_t ii = col_index[i];
-			for (uint32_t k = 0; k < M; ++k) {
-				const uint32_t kk = col_index[k + offset_b];
-				z += c[kk] * a[k * K + ii];
-			}
-			delta[i] = c[ii] - z;
-
-			if (delta[i] > 0.0) {
-				isPositiveDelta = true;
-			}
-		}
-
-		if (!isPositiveDelta) break;
-
-		double max_delta = 0.0;
 		uint32_t index_r = 0;
-		for (uint32_t i = 0; i < M; ++i) {
-			const double tmp = delta[i];
-			if (tmp > max_delta) {
-				max_delta = tmp;
+
+		bool isPositiveDelta = false;
+		double max_delta = 0.0;
+		for (uint32_t i = 0; i < offset_b; ++i) {
+			double z = 0.0;
+			const uint32_t ii = col_index_nb[i];
+			for (uint32_t k = 0; k < M; ++k) {
+				const uint32_t kk = col_index_b[k];
+				z += c[kk] * a[k * N_ext + ii];
+			}
+			const double delta_i = c[ii] - z;
+
+			if (delta_i > max_delta) {
+				isPositiveDelta = true;
+				max_delta = delta_i;
 				index_r = i;
 			}
 		}
-		const uint32_t col_r = col_index[index_r];
+
+		if (!isPositiveDelta) {
+			break;
+		}
+		const uint32_t col_r = col_index_nb[index_r];
 
 		uint32_t row_s = 0;
 		double min_delta = DBL_MAX;
 		for (uint32_t i = 0; i < M; ++i) {
-			const double a_ir = a[i * K + col_r];
+			const double a_ir = a[i * N_ext + col_r];
 			if (a_ir <= 0) continue;
-			const double tmp = x_[col_index[i + offset_b]] / a_ir;
+			const double tmp = x_[col_index_b[i]] / a_ir;
 			if (tmp <= min_delta) {
 				min_delta = tmp;
 				row_s = i;
 			}
 		}
-		const uint32_t col_s = col_index[row_s + offset_b];
-		double *a_s = a + row_s * K;
+		const uint32_t col_s = col_index_b[row_s];
+		double *a_s = a + row_s * N_ext;
 
-		const double tmp = 1.0 / *(a + row_s * K + col_r);
+		const double tmp = 1.0 / *(a_s + col_r);
 		x_[col_r] = x_[col_s] * tmp;
 		const double x_r = x_[col_r];
-		for (uint32_t i = 0; i < K; ++i) {
+		for (uint32_t i = 0; i < N_ext; ++i) {
 			*(a_s + i) *= tmp;
 		}
 
 		for (uint32_t i = 0; i < M; ++i) {
 			if (i == row_s) continue;
-			double *a_i = a + i * K;
+			double *a_i = a + i * N_ext;
 			const double factor = *(a_i + col_r); // a[s,r] = 1
-			x_[col_index[i + offset_b]] -= factor * x_r;
-			for (uint32_t j = 0; j < K; ++j) {
+			x_[col_index_b[i]] -= factor * x_r;
+			for (uint32_t j = 0; j < N_ext; ++j) {
 				*(a_i + j) -= *(a_s + j) * factor;
 			}
 		}
 
-		col_index[row_s + offset_b] = col_r;
-		col_index[index_r] = col_s;
+		col_index_b[row_s] = col_r;
+		col_index_nb[index_r] = col_s;
 		x_[col_s] = 0.0;
 	}
 	if (iter == max_iter) {
@@ -206,7 +214,6 @@ int32_t simplex_max(const Tableau_t *table, double *x) {
 	free(a);
 	free(c);
 	free(x_);
-	free(delta);
 
 	return 0;
 }

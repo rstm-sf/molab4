@@ -229,7 +229,8 @@ int32_t simplex(const Tableau_t *table, double *x) {
 	if (iter == max_iter) {
 		printf("\nWarning: MAX ITER!\n");
 	}
-	printf("ITERs = %" PRId32 "\n\n", iter);
+	printf("ITERs = %" PRId32 "\n", iter);
+	print_a_task(a_, M, N_ext);
 
 	memcpy(x, x_, N * sizeof(double));
 

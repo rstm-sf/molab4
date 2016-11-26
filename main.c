@@ -32,7 +32,7 @@ typedef struct Tableau {
 inline double f(const double *c, const double *x, const uint32_t N);
 void print_a_task(const double *mat, const uint32_t M, const uint32_t N);
 void print_x(const double *x, const uint32_t N);
-void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Sign_t extreme);
+void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme);
 int32_t simplex(const Tableau_t *table, double *x);
 
 int32_t main() {
@@ -103,7 +103,7 @@ void print_x(const double *x, const uint32_t N) {
 	return;
 }
 
-void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Sign_t extreme) {
+void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme) {
 	double       *p = dst_c;
 	const double *q = src_c;
 	for (uint32_t i = 0; i < N; ++i) {

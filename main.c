@@ -30,7 +30,7 @@ typedef struct Tableau {
 } Tableau_t;
 
 inline double f(const double *c, const double *x, const uint32_t N);
-void print_a_task(const double *mat, const uint32_t M, const uint32_t N);
+void print_a_cb(const double *mat, const double *c, const uint32_t *col_index_b, const uint32_t M, const uint32_t N);
 void print_x(const double *x, const uint32_t N);
 void copy_c_cond_extr(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme);
 int32_t simplex(const Tableau_t *table, double *x);
@@ -87,7 +87,7 @@ inline double f(const double *c, const double *x, const uint32_t N) {
 	return res;
 }
 
-void print_a_task(const double *mat, const uint32_t M, const uint32_t N) {
+void print_a_cb(const double *mat, const double *c, const uint32_t *col_index_b, const uint32_t M, const uint32_t N) {
 	const double *mat_ = mat;
 	for (uint32_t i = 0; i < M; ++i) {
 		for (uint32_t j = 0; j < N; ++j) {
@@ -95,7 +95,16 @@ void print_a_task(const double *mat, const uint32_t M, const uint32_t N) {
 		}
 		printf("\n");
 	}
-	printf("\n");
+	printf("\nBasic columns:(\t");
+	for (uint32_t i = 0; i < M; ++i) {
+		printf("[%" PRIu32 "]\t", col_index_b[i]);
+	}
+	printf(").\nValue basic c:\n");
+	for (uint32_t i = 0; i < M; ++i) {
+		const uint32_t kk = col_index_b[i];
+		printf("c[%" PRIu32 "] = %lf\t", kk, c[kk]);
+	}
+	printf("\n\n");
 	return;
 }
 
@@ -166,7 +175,7 @@ int32_t simplex(const Tableau_t *table, double *x) {
 	const uint32_t max_iter = N_ext + 1;
 	for (iter = 0; iter < max_iter; ++iter) {
 		printf("ITER = %" PRId32 "\n", iter);
-		print_a_task(a_, M, N_ext);
+		print_a_cb(a_, c_, col_index_b, M, N_ext);
 
 		uint32_t index_r = 0;
 
@@ -180,6 +189,7 @@ int32_t simplex(const Tableau_t *table, double *x) {
 				z += c_[kk] * a_[k * N_ext + ii];
 			}
 			const double delta_i = c_[ii] - z;
+			printf(" i=%" PRIu32 ":\tci = %lf, zi = %lf, deltai = %lf;\n", ii, c_[ii], z, delta_i);
 
 			if (delta_i > max_delta) {
 				isExitDelta = false;
@@ -189,6 +199,7 @@ int32_t simplex(const Tableau_t *table, double *x) {
 		}
 
 		if (isExitDelta) {
+			printf("\nThe task is solved.\n");
 			break;
 		}
 
@@ -232,12 +243,12 @@ int32_t simplex(const Tableau_t *table, double *x) {
 		col_index_nb[index_r] = col_s;
 		x_[col_s] = 0.0;
 		x_[col_r] = x_r;
+		print_x(x_, N_ext);
 	}
 	if (iter == max_iter) {
 		printf("\nWarning: MAX ITER!\n");
 	}
-	printf("ITERs = %" PRId32 "\n", iter);
-	print_a_task(a_, M, N_ext);
+	printf("ITERs = %" PRIu32 "\n", iter);
 
 	memcpy(x, x_, N * sizeof(double));
 

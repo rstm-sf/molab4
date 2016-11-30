@@ -38,7 +38,7 @@ int32_t simplex(const Tableau_t *table, double *x);
 int32_t main() {
 	double b[4] = { 140.0, 21.0, 16.0, 15.0 };
 	double c[4] = { 2.4, 2.7, 13.8, 2.75 };
-	Extreme_t extr = MAX;
+	Extreme_t extr = MIN;
 
 	Tableau_t table;
 	table.M = table.N = 4;
@@ -149,7 +149,9 @@ int32_t simplex(const Tableau_t *table, double *x) {
 		col_index[i] = i;
 	}
 	for (uint32_t i = M; i < N_ext; ++i) {
-		if (i >= N) {
+		if (i >= N && i < offset_b) {
+			c_[i] = 0.0;
+		} else {
 			c_[i] = -sufficiently_large_number;
 		}
 

@@ -15,8 +15,8 @@ typedef enum Sign {
 } Sign_t;
 
 typedef enum Extreme {
-	MIN = 1,
-	MAX = -1
+	MIN = -1,
+	MAX = 1
 } Extreme_t;
 
 typedef struct Tableau {
@@ -26,48 +26,52 @@ typedef struct Tableau {
 	double *b;
 	double *c;
 	Sign_t *sign;
-	Extreme_t ext;
+	Extreme_t extr;
 } Tableau_t;
 
 inline double f(const double *c, const double *x, const uint32_t N);
 void print_a_task(const double *mat, const uint32_t M, const uint32_t N);
 void print_x(const double *x, const uint32_t N);
-void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme);
+void copy_c_cond_extr(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme);
 int32_t simplex(const Tableau_t *table, double *x);
 
 int32_t main() {
-	double mat[4 * 4] = { 1.01, 1.01,      9.45,       0.95,
-	                      0.2,  1.0 / 6.0, 0.0,        0.0,
-	                      0.0,  0.0,       1.0 / 30.0, 4.0,
-	                      0.0,  0.0,       0.0,        1.0 };
 	double b[4] = { 140.0, 21.0, 16.0, 15.0 };
 	double c[4] = { 2.4, 2.7, 13.8, 2.75 };
-	Sign_t sign[4] = { NOT_GREATER_THAN, NOT_GREATER_THAN, NOT_GREATER_THAN, NOT_GREATER_THAN };
-	Extreme_t ext = MAX;
-	/*
-	double mat[4 * 4] = { 1.01, 0.2,       0.0,        0.0,
-	                      1.01, 1.0 / 6.0, 0.0,        0.0,
-	                      9.45, 0.0,       1.0 / 30.0, 0.0,
-	                      0.95, 0.0,       4.0,        1.0 };
-	double b[4] = { 2.4, 2.7, 13.8, 2.75 };
-	double c[4] = { 140.0, 21.0, 16.0, 15.0 };
-	Sign_t sign[4] = { NOT_LESS_THAN, NOT_LESS_THAN, NOT_LESS_THAN, NOT_LESS_THAN };
-	Extreme_t ext = MIN;
-	*/
-	Tableau_t table;
-	table.M = 4;
-	table.N = 4;
-	table.a = mat;
-	table.b = b;
-	table.c = c;
-	table.sign = sign;
-	table.ext = ext;
+	Extreme_t extr = MAX;
 
-	double *x = (double *)calloc(table.M, sizeof(double));
+	Tableau_t table;
+	table.M = table.N = 4;
+	table.extr = extr;
+	if (extr == MAX) {
+		double mat[4 * 4] = { 1.01, 1.01,      9.45,       0.95,
+	                          0.2,  1.0 / 6.0, 0.0,        0.0,
+	                          0.0,  0.0,       1.0 / 30.0, 4.0,
+	                          0.0,  0.0,       0.0,        1.0 };
+		Sign_t sign[4] = { NOT_GREATER_THAN, NOT_GREATER_THAN, NOT_GREATER_THAN, NOT_GREATER_THAN };
+
+		table.a = mat;
+		table.b = b;
+		table.c = c;
+		table.sign = sign;
+	} else {
+		double mat[4 * 4] = { 1.01, 0.2,       0.0,        0.0,
+	                          1.01, 1.0 / 6.0, 0.0,        0.0,
+	                          9.45, 0.0,       1.0 / 30.0, 0.0,
+	                          0.95, 0.0,       4.0,        1.0 };
+		Sign_t sign[4] = { NOT_LESS_THAN, NOT_LESS_THAN, NOT_LESS_THAN, NOT_LESS_THAN };
+
+		table.a = mat;
+		table.b = c;
+		table.c = b;
+		table.sign = sign;
+	}
+
+	double *x = (double *)calloc(table.N, sizeof(double));
 	simplex(&table, x);
 
 	print_x(x, table.M);
-	printf("F(x) = %f\n", f(table.c, x, table.M));
+	printf("F(x) = %f\n", f(table.c, x, table.N));
 
 	system("pause");
 
@@ -103,7 +107,8 @@ void print_x(const double *x, const uint32_t N) {
 	return;
 }
 
-void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme) {
+// if extreme = MIN then c_i = -ci
+void copy_c_cond_extr(double *dst_c, const double *src_c, const uint32_t N, const Extreme_t extreme) {
 	double       *p = dst_c;
 	const double *q = src_c;
 	for (uint32_t i = 0; i < N; ++i) {
@@ -113,7 +118,7 @@ void copy_c(double *dst_c, const double *src_c, const uint32_t N, const Extreme_
 }
 
 int32_t simplex(const Tableau_t *table, double *x) {
-	static const double sufficiently_large_number = -1.0e+10;
+	static const double sufficiently_large_number = 1.0e+10;
 	const uint32_t N = table->N;
 	const uint32_t M = table->M;
 	const uint32_t K = M; // in the number inequality
@@ -121,7 +126,7 @@ int32_t simplex(const Tableau_t *table, double *x) {
 	const uint32_t offset_b = N_ext - M;
 	const double *b = table->b;
 
-	for (uint32_t i = 0; i < M; ++i) {
+	for (uint32_t i = 0; i < N; ++i) {
 		assert(b[i] >= 0);
 	}
 
@@ -132,10 +137,10 @@ int32_t simplex(const Tableau_t *table, double *x) {
 	// col_index[0 .. N_ext - M - 1] - not basic; col_index[N_ext - M .. N_ext - 1] - basic
 	uint32_t *col_index = (uint32_t *)malloc(N_ext * sizeof(uint32_t));
 	uint32_t *col_index_nb = col_index;
-	uint32_t *col_index_b  = col_index + offset_b;
+	uint32_t *col_index_b = col_index + offset_b;
 
 	memcpy(x_, x, N * sizeof(double));
-	copy_c(c_, table->c, N, table->ext); // if extreme = MIN then c_i = -ci
+	copy_c_cond_extr(c_, table->c, N, table->extr);
 	for (uint32_t i = 0; i < M; ++i) {
 		memcpy(a_ + i * N_ext, table->a + i * N, N * sizeof(double));
 		a_[i * N_ext + i + N] = (double)(table->sign[i]);
@@ -145,7 +150,7 @@ int32_t simplex(const Tableau_t *table, double *x) {
 	}
 	for (uint32_t i = M; i < N_ext; ++i) {
 		if (i >= N) {
-			c_[i] = sufficiently_large_number;
+			c_[i] = -sufficiently_large_number;
 		}
 
 		col_index[i] = i;
